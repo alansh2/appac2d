@@ -20,7 +20,7 @@ R = [cosd(alphaDeg) -sind(alphaDeg);sind(alphaDeg) cosd(alphaDeg)];
 for i = nSurfs:-1:1 % populating the last entry allocates necessary space
     foils.m(i) = size(surfaces{i},1) - 1;
 end
-M = sum([foils.m]); % total number of panels
+M = sum(foils.m); % total number of panels
 
 % Build unified struct for all lifting surfaces %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 k = M;
@@ -56,7 +56,9 @@ if oper == 1
     Qtan = B*foils.gamma + cos(foils.theta);
     out{1} = foils;
 else
-    [wakes,foils.gamma,~,~] = solveWake(foils,inv(A),RHS,CT,wakeOptions);
+    [wakes,foils.gamma,iter,res] = solveWake(foils,inv(A),RHS,CT,wakeOptions);
+    fprintf(1,'Iterations: %d\n',iter);
+    fprintf(1,'Residual: %.3e\n',res);
     [U,V] = influence(foils.co,wakes,1);
     D = U.*cos(foils.theta) + V.*sin(foils.theta);
     Qtan = B*foils.gamma + cos(foils.theta) + D*wakes.gamma;
@@ -110,6 +112,7 @@ xDisk = 0;
 % Default options
 wakeOptions.MaxIterations = 50;
 wakeOptions.FunctionTolerance = 1e-6;
+wakeOptions.ConvergenceCriterion = 1;
 wakeOptions.RelaxationFactor = 0.5;
 wakeOptions.NumPanels = 100;
 wakeOptions.WakeLengthChords = 9;

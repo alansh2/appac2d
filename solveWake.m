@@ -12,6 +12,16 @@ function [wakes,gamma,iter,E] = solveWake(foils,Ainv,RHS,CT,opts)
 %   7. If the new wake circulation is close to the previous solution, exit the
 %      program, else return to step 2
 
+% Setup for airfoil bound circulation convergence criterion %%%%%%%%%%%%%%%%%%
+ia = cumsum(foils.m); % index of the first point on the last panel
+ib = ia - foils.m + 1; % index of the second point on the last panel
+M = ia(end); % total number of airfoil panels
+edge = (1:M).' + [0 1]; % edges defined by [first point, second point]
+edge(ia,2) = ib; % correct index wraps
+ds = sqrt(foils.dx.^2 + foils.dy.^2); % panel widths for integration
+gamma = Ainv*RHS; % initial unpowered solution
+circ = 0.5*(gamma(edge(:,1)) + gamma(edge(:,2)));
+
 % Attach wake to the trailing edge of each propulsive element %%%%%%%%%%%%%%%%
 N = opts.NumPanels + 1; % add far-field panel to the panel count
 wakes.m = [N N];
@@ -45,8 +55,8 @@ if strcmpi(opts.Display,'iter') || strcmpi(opts.Display,'final')
         plot(foils.xo(k+[1:foils.m(i) 1]),foils.yo(k+[1:foils.m(i) 1]),'k-');
         k = k + foils.m(i);
     end
-    h(1) = plot(wakes.xo(1:N),wakes.yo(1:N),'b.-');
-    h(2) = plot(wakes.xo(N+1:2*N),wakes.yo(N+1:2*N),'r.-');
+    h(1) = plot(wakes.xo(1:N),wakes.yo(1:N),'b-');
+    h(2) = plot(wakes.xo(N+1:2*N),wakes.yo(N+1:2*N),'r-');
 end
 
 iter = 0;
@@ -116,7 +126,18 @@ while (E > opts.FunctionTolerance) && (iter < opts.MaxIterations)
         (wakes.so(N+k:2*N)-wakes.so(2*N))/(wakes.so(2*N)-wakes.so(k+N)+eps);
 
     % Calculate residual between current and previous iteration %%%%%%%%%%%%%%
-    E = sum(abs(gnew - wakes.gamma))/(2*N*gammaInf);
+    if opts.ConvergenceCriterion == 1
+        E = sum(abs(gnew - wakes.gamma))/(2*N*gammaInf);
+    elseif opts.ConvergenceCriterion == 2
+        circnew = 0.5*(gamma(edge(:,1)) + gamma(edge(:,2)));
+        % E = dot(abs(circnew - circ),ds);
+        dbound = cellfun(@sum,mat2cell((circnew - circ).*ds,foils.m));
+        E = max(abs(dbound));
+        circ = circnew;
+    else
+        error('solveWake:invalidValue', ...
+            'Invalid value for convergence criterion selector.')
+    end
 
     % Adjust wake circulation by a relaxation factor %%%%%%%%%%%%%%%%%%%%%%%%%
     wakes.gamma = opts.RelaxationFactor*gnew + ...
