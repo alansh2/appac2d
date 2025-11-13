@@ -1,4 +1,4 @@
-function [wakes,gamma,iter,E] = solveWake(foils,Ainv,RHS,CT,opts)
+function [wakes,gamma,iter,E] = solveWake(foils,h,Ainv,RHS,CT,opts)
 % SOLVEWAKE  Solve for the global circulation solution and wake shape using
 % Shollenberger's algorithm:
 %   1. Guess initial wake shape and bound circulation
@@ -25,7 +25,7 @@ circ = 0.5*(gamma(edge(:,1)) + gamma(edge(:,2)));
 % Attach wake to the trailing edge of each propulsive element %%%%%%%%%%%%%%%%
 N = opts.NumPanels + 1; % add far-field panel to the panel count
 wakes.m = [N N];
-[wakes.xo,wakes.yo] = initWake(foils,Ainv*RHS,opts); % obtain starting wake shape
+[wakes.xo,wakes.yo] = initWake(foils,h,Ainv*RHS,opts); % obtain starting wake shape
 for i = 2:-1:1
     k = (i-1)*N+(1:N);
     % if strcmpi(opts.NodeSpacing,'cosine')
@@ -55,8 +55,8 @@ if strcmpi(opts.Display,'iter') || strcmpi(opts.Display,'final')
         plot(foils.xo(k+[1:foils.m(i) 1]),foils.yo(k+[1:foils.m(i) 1]),'k-');
         k = k + foils.m(i);
     end
-    h(1) = plot(wakes.xo(1:N),wakes.yo(1:N),'b-');
-    h(2) = plot(wakes.xo(N+1:2*N),wakes.yo(N+1:2*N),'r-');
+    hp(1) = plot(wakes.xo(1:N),wakes.yo(1:N),'b-');
+    hp(2) = plot(wakes.xo(N+1:2*N),wakes.yo(N+1:2*N),'r-');
 end
 
 iter = 0;
@@ -65,13 +65,13 @@ while (E > opts.FunctionTolerance) && (iter < opts.MaxIterations)
     iter = iter + 1;
 
     if strcmpi(opts.Display,'iter')
-        set(h(1),'XData',wakes.xo(1:N),'YData',wakes.yo(1:N));
-        set(h(2),'XData',wakes.xo(N+1:2*N),'YData',wakes.yo(N+1:2*N));
+        set(hp(1),'XData',wakes.xo(1:N),'YData',wakes.yo(1:N));
+        set(hp(2),'XData',wakes.xo(N+1:2*N),'YData',wakes.yo(N+1:2*N));
         drawnow;
     end
 
     % Solve airfoil circulation distribution %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    [U,V] = influence(foils.co,wakes,1);
+    [U,V] = velmat(foils.co,wakes,1,h);
     A = -U.*sin(foils.theta) + V.*cos(foils.theta);
     gamma = Ainv*(RHS - [A*wakes.gamma; ...
                          -wakes.gamma(1); ...
@@ -79,10 +79,10 @@ while (E > opts.FunctionTolerance) && (iter < opts.MaxIterations)
                          zeros(numel(foils.m)-2,1)]);
 
     % Calculate induced velocities on wake boundaries %%%%%%%%%%%%%%%%%%%%%%%%
-    [U,V] = influence(wakes.co,foils,1);
+    [U,V] = velmat(wakes.co,foils,1,h);
     u = U*gamma + 1;
     v = V*gamma;
-    [U,V] = influence(wakes.co,wakes,0);
+    [U,V] = velmat(wakes.co,wakes,0,h);
     u = u + U*wakes.gamma;
     v = v + V*wakes.gamma;
     Vbar = sqrt(u.*u + v.*v);
@@ -145,13 +145,13 @@ while (E > opts.FunctionTolerance) && (iter < opts.MaxIterations)
 end
 
 if strcmpi(opts.Display,'iter') || strcmpi(opts.Display,'final')
-    set(h(1),'XData',wakes.xo(1:N),'YData',wakes.yo(1:N));
-    set(h(2),'XData',wakes.xo(N+1:2*N),'YData',wakes.yo(N+1:2*N));
+    set(hp(1),'XData',wakes.xo(1:N),'YData',wakes.yo(1:N));
+    set(hp(2),'XData',wakes.xo(N+1:2*N),'YData',wakes.yo(N+1:2*N));
     drawnow;
 end
 end
 
-function [xout,yout] = initWake(foils,gamma,opts)
+function [xout,yout] = initWake(foils,h,gamma,opts)
     idx = [0 0];
     for i = 1:2
         idx = idx(2) + [1 foils.m(i)];
@@ -176,7 +176,7 @@ function [xout,yout] = initWake(foils,gamma,opts)
 
     function dydt = objfun(t,y)
         dydt = zeros(4,1);
-        [U,V] = influence(reshape(y,[2 2]),foils,1);
+        [U,V] = velmat(reshape(y,[2 2]),foils,1,h);
         dydt(1:2) = U*gamma + 1;
         dydt(3:4) = V*gamma;
     end
