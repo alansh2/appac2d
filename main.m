@@ -38,6 +38,7 @@ drawnow;
 % Sweep across multiple ground heights
 % opts.Display = 'none';
 h = [0.25 0.5 0.75 1 Inf];
+colors = lines(length(h));
 f = figure;
 hold on;
 ax = gca;
@@ -51,8 +52,8 @@ for i = 1:length(h)
     [Cp,xc] = panel2d(surfaces,5,h(i),1,0.8-xoffset,opts);
 
     % Plot nothing to get correct legend entries and next color
-    p(2*i-1) = plot(ax,NaN,NaN,'--','DisplayName',sprintf('$h/c=%s$ (lower)',hstr));
-    color = get(p(2*i-1),'Color'); % get color for these Cps
+    color = colors(i,:);
+    p(2*i-1) = plot(ax,NaN,NaN,'--','Color',color,'DisplayName',sprintf('$h/c=%s$ (lower)',hstr));
     p(2*i) = plot(ax,NaN,NaN,'-','Color',color,'DisplayName',sprintf('$h/c=%s$ (upper)',hstr));
     for j = 1:numel(Cp)
         [~,le] = min(xc{j});
@@ -75,4 +76,4 @@ legend(p,'Interpreter','latex', ...
     'Location','eastoutside', ...
     'FontSize',8,'Units','Points');
 
-exportgraphics(f,'aeropropulsiveIGE.pdf')
+exportgraphics(f,'aeropropulsiveIGE-1.pdf')
